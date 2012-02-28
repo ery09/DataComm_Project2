@@ -577,6 +577,12 @@ void read_from_activesockets(void)
                     // TODO if handing peerstodelete... 
                     // peerstodelete.insert(activeconnections[i].peerid);
                 } //end if |data rev'd| <= 0
+
+/*
+    TODO YOU ARE HERE!!!!
+ */
+
+
                 else // Actually received some data
                 {
                     memcpy(activeconnections[i].sock_buf + activeconnections[i].sock_buf_byte_counter, buf, nbytes);
@@ -587,13 +593,35 @@ void read_from_activesockets(void)
                     
                     while (num_to_read <= activeconnections[i].sock_buf_byte_counter)
 					{
+                        // Check for types
+                        // of file sent 
+                        if(type == PACKET_TYPE_CONTROL)
+                        {
+                        
+                        }
+
+                        // done checking packet type
+
+                        // Seem to remove what has been read so far from peer's buffer
+                        remove_read_from_buf(activeconnections[i].sock_buf, num_to_read);
+                        // Remove counter of num byted left to read from peer's cntr
+                        activeconnections[i].sock_buf_byte_counter -= num_to_read;
+                        // if read everything get out
+                        if (activeconnections[i].sock_buf_byte_counter == 0)
+                            break;
+
+                        type = activeconnections[i].sock_buf[0];
+                        // get_num_to_read basically just returns a block
+                        // unless a control packet is sent
+                        num_to_read = get_num_to_read(type);
+
                     } // end while for reading in buffer
 
                 } //end else received data
-            }
-        }
+            } // end check that activeconnections[i]'s socket has set a FD
+        }// and for loop going through activeconnections
 
-    }
+    } // end else of read from active FDs
 }
 
 void *thread_sending_file(void *arg)
