@@ -561,6 +561,74 @@ void client_run(void)
      }
 
 	// todo: add your code here for the listening socket
+    // TODO NOTE: server has this v code before adding stdin to socket ^
+
+    // 2-27-12 @7:30pm Starting 
+
+    // get the listener
+    if ((listener = socket(PF_INET, SOCK_STREAM, 0)) == -1) 
+    {
+       	printf("cannot create a socket");
+     	fflush(stdout);
+        exit(1);
+    }
+    
+    #ifdef DEBUG_CLIENT_RUN
+    printf("Client Run: Client %d created socket %d as its listening port\n", MYPEERID, listener);
+    #endif
+
+    // lose the pesky "address already in use" error message
+    if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes,sizeof(int)) == -1) 
+    {
+        printf("setsockopt");
+	    fflush(stdout);
+       	exit(1);
+    }
+
+    // bind to the port
+    myaddr.sin_family = AF_INET;
+    myaddr.sin_addr.s_addr = INADDR_ANY;
+    myaddr.sin_port = htons(MY_LISTEN_PORT);
+    memset(&(myaddr.sin_zero), '\0', 8);
+    if (bind(listener, (struct sockaddr *)&myaddr, sizeof(myaddr)) == -1) 
+    {
+        printf("could not bind to MYPORT");
+	    fflush(stdout);
+      	exit(1);
+     }
+
+    #ifdef DEBUG_CLIENT_RUN
+    printf("Client Run: Client %d bound to listening socket %d \n", MYPEERID, listener);
+    #endif
+     
+     // listen
+     if (listen(listener, 40) == -1) 
+     {
+       	printf("too many backlogged connections on listen");
+  	    fflush(stdout);
+        exit(1);
+     }
+
+    #ifdef DEBUG_CLIENT_RUN
+    printf("Client Run: Client %d  listening to socket %d \n", MYPEERID, listener);
+    #endif
+
+     // add the listener to the master set
+     FD_SET(listener, &master);
+
+     // keep track of the biggest file descriptor
+     if (listener > highestsocket)
+     {
+      	highestsocket = listener;
+     }
+		
+     FD_SET(fileno(stdin), &master);
+
+     if (fileno(stdin) > highestsocket)
+     {
+      	highestsocket = fileno(stdin);
+     }
+
 
 
     // main loop
