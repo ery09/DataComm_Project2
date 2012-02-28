@@ -450,9 +450,34 @@ void read_from_activesockets(void)
     socklen_t addrlen;
     int i, j;
 
+    // NOTE: It appears as though prior to entering this function
+    // read_fds is set to the master list 
+
+    // Received something on my listening port
     if ((listener != -1) && FD_ISSET(listener,&read_fds))
     {
 		// todo: add your code here.
+        // 2-27-12 @ 8 pm Starting here
+
+        // handle new connections
+        addrlen = sizeof(remoteaddr);
+        if ((newfd = accept(listener, (struct sockaddr *)&remoteaddr,&addrlen)) == -1) 
+        { 
+              printf("Trouble accepting a new connection");
+        } 
+        else 
+        {
+            FD_SET(newfd, &master); // add to master set
+            if (newfd > highestsocket) 
+            { 
+                 highestsocket = newfd;
+            }
+            
+            printf("New connection from %s port number %d on socket %d\n", inet_ntoa(remoteaddr.sin_addr), remoteaddr.sin_port, newfd);
+			  
+            Connection newconn(newfd,  inet_ntoa(remoteaddr.sin_addr), remoteaddr.sin_port);	
+            activeconnections.push_back(newconn);
+       }
     }
 
     if (FD_ISSET(fileno(stdin),&read_fds))
@@ -515,7 +540,60 @@ void read_from_activesockets(void)
 
 
 	// todo: add your code here to handle other clients 
+    // TODO
+    // It seems like first if will add to activeconnections but without peerid
+    // Going to follow structure of server...
+    else  
+    {
+        // Run throught existing connections looking for data
+        // DO NOT KNOW IF NEED TO WORRY ABOUT THIS (prob do) peerstodelete.clear();
 
+        for(int i=0; i<activeconnections.size(); i++)
+        {
+            // See if have something from peer's socket
+            // make sure peer is in the read_fds set
+            if(FD_ISSET(activeconnections[i].socket, &read_fds))
+            {
+                nbytes = recv(activeconnections[i].socket, buf, MAXBUFLEN, 0);
+
+                // Make sure actually received someting
+                if(nbytes<=0)
+                {
+                    // Error or Connection is close
+                    if(nbytes==0) // Connection is close
+                    {
+                        printf("Peer %d (socket %d) has closed its connection\n", activeconnections[i].peerid, activeconnections[i].socket);
+                    }
+                    else // Error
+                    {
+                        printf("Received an error from peer %d...qutting\n", activeconnections[i].peerid);
+                    }
+
+                    // This connection is not longer active
+                    // 1. Close connection to socket
+                    close(activeconnections[i].socket);
+                    // 2. Remove connection from master list
+                    FD_CLR(activeconnections[i].socket, &master);
+                    // TODO if handing peerstodelete... 
+                    // peerstodelete.insert(activeconnections[i].peerid);
+                } //end if |data rev'd| <= 0
+                else // Actually received some data
+                {
+                    memcpy(activeconnections[i].sock_buf + activeconnections[i].sock_buf_byte_counter, buf, nbytes);
+                    activeconnections[i].sock_buf_byte_counter += nbytes;
+
+                    int type = activeconnections[i].sock_buf[0];
+                    int num_to_read = get_num_to_read(type);
+                    
+                    while (num_to_read <= activeconnections[i].sock_buf_byte_counter)
+					{
+                    } // end while for reading in buffer
+
+                } //end else received data
+            }
+        }
+
+    }
 }
 
 void *thread_sending_file(void *arg)
@@ -621,14 +699,7 @@ void client_run(void)
      {
       	highestsocket = listener;
      }
-		
-     FD_SET(fileno(stdin), &master);
-
-     if (fileno(stdin) > highestsocket)
-     {
-      	highestsocket = fileno(stdin);
-     }
-
+    /* End of creating and binding to listening port */
 
 
     // main loop
